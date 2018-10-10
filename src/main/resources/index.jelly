@@ -1,0 +1,4 @@
+<?jelly escape-by-default='true'?>
+<div>
+  Maintains a cache of the upstream / downstream build relationships and makes it available for other plugins.
+</div>
