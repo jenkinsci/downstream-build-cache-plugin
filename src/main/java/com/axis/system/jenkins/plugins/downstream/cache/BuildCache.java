@@ -10,8 +10,10 @@ import hudson.model.Job;
 import hudson.model.Run;
 import hudson.security.ACL;
 import hudson.security.ACLContext;
+import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -75,8 +77,7 @@ public class BuildCache {
   private List<Run> getUpstreamBuilds(CauseAction causeAction) {
     List<Run> upstreamBuilds = new ArrayList<>();
     for (Cause cause : causeAction.getCauses()) {
-      if (Cause.UpstreamCause.class.isInstance(cause)) {
-
+      if (cause instanceof Cause.UpstreamCause) {
         Cause.UpstreamCause upstreamCause = (Cause.UpstreamCause) cause;
 
         Job upstreamJob =
@@ -182,7 +183,7 @@ public class BuildCache {
    * @return Downstream builds or empty set if none is found
    */
   public Set<Run> getDownstreamBuilds(Run run) {
-    Set<Run> downstreamBuilds = new HashSet<>();
+    Set<Run> downstreamBuilds = new TreeSet<>(new BuildComparator());
     for (String id :
         downstreamBuildCache.getOrDefault(run.getExternalizableId(), Collections.emptySet())) {
       Run downstreamRun = Run.fromExternalizableId(id);
@@ -247,5 +248,21 @@ public class BuildCache {
       }
     }
     return filteredDownstreamBuilds;
+  }
+
+  /**
+   * Allows returned downstreamBuild Sets to be sorted first by project name and then by number. The
+   * default comparator for Run prioritizes build numbers before project name.
+   */
+  public static class BuildComparator implements Comparator<Run>, Serializable {
+
+    @Override
+    public int compare(Run r1, Run r2) {
+      int res = r1.getParent().getFullName().compareTo(r2.getParent().getFullName());
+      if (res == 0) {
+        return r1.getNumber() - r2.getNumber();
+      }
+      return res;
+    }
   }
 }
