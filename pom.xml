@@ -9,6 +9,12 @@
   <version>1.1-SNAPSHOT</version>
   <packaging>hpi</packaging>
 
+  <name>Downstream Build Cache Plugin</name>
+  <description>Maintains a cache of the upstream / downstream build relationships and makes it
+    available for other plugins.
+  </description>
+  <url>axis.com</url>
+
   <parent>
     <groupId>org.jenkins-ci.plugins</groupId>
     <artifactId>plugin</artifactId>
@@ -46,11 +52,13 @@
     <scmCommentPrefix>maven-release-plugin:</scmCommentPrefix>
   </properties>
 
-  <name>Downstream Build Cache Plugin</name>
-  <description>Maintains a cache of the upstream / downstream build relationships and makes it
-    available for other plugins.
-  </description>
-  <url>axis.com</url>
+  <developers>
+    <developer>
+      <id>GustafL</id>
+      <name>Gustaf Lundh</name>
+      <email>gustaf.lundh@axis.com</email>
+    </developer>
+  </developers>
 
   <licenses>
     <license>
