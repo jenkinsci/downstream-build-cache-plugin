@@ -4,14 +4,18 @@ import static hudson.init.InitMilestone.JOB_LOADED;
 
 import hudson.init.Initializer;
 import hudson.init.Terminator;
+import hudson.model.AbstractItem;
 import hudson.model.Cause;
+import hudson.model.Cause.UpstreamCause;
 import hudson.model.CauseAction;
 import hudson.model.Job;
+import hudson.model.Queue;
 import hudson.model.Run;
 import hudson.security.ACL;
 import hudson.security.ACLContext;
 import java.io.Serializable;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashSet;
@@ -22,6 +26,7 @@ import java.util.TimerTask;
 import java.util.TreeSet;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 import jenkins.model.Jenkins;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -40,10 +45,6 @@ public class BuildCache {
       new ConcurrentHashMap<>();
 
   private Timer timer;
-
-  private static class InstanceHolder {
-    public static BuildCache INSTANCE = new BuildCache();
-  }
 
   /**
    * Returns the instance of this class.
@@ -66,6 +67,48 @@ public class BuildCache {
   @Terminator()
   public static void stop() throws Exception {
     getCache().stopGarbageCollector();
+  }
+
+  private static boolean isQueueItemCausedBy(Queue.Item item, Run run) {
+    return item.getCauses().stream()
+        .anyMatch(
+            cause ->
+                cause instanceof UpstreamCause
+                    && ((UpstreamCause) cause).getUpstreamRun().equals(run));
+  }
+
+  /**
+   * Helper method to find downstream Queue.Items triggered by Run.
+   *
+   * @param run The upstream build
+   * @return Queue.Items that has run as upstream cause
+   */
+  public static Set<Queue.Item> getDownstreamQueueItems(Run run) {
+    return getDownstreamQueueItems(Queue.getInstance().getItems(), run);
+  }
+
+  /**
+   * Helper method to find downstream Queue.Items triggered by Run.
+   *
+   * <p>Since Queue.getItems() is validating readability permissions on every queue item, this
+   * method allows for providing a cached version of the Queue.Items. This is helpful if many Queue
+   * downstream look-ups are needed within a very short span of time.
+   *
+   * @param items The cached version of Queue.getItems()
+   * @param run The upstream build
+   * @return Queue.Items that has run as upstream cause
+   */
+  public static Set<Queue.Item> getDownstreamQueueItems(Queue.Item[] items, Run run) {
+    Set<Queue.Item> downstreamQueueItems = new TreeSet<>(new QueueTaskComparator());
+    // It is guaranteed that a superclass of Run can be put on the Queue. Check if the parent
+    // implements Queue.Task.
+    if (run.getParent() instanceof Queue.Task) {
+      downstreamQueueItems.addAll(
+          Arrays.stream(items)
+              .filter(it -> isQueueItemCausedBy(it, run))
+              .collect(Collectors.toSet()));
+    }
+    return downstreamQueueItems;
   }
 
   /**
@@ -250,6 +293,10 @@ public class BuildCache {
     return filteredDownstreamBuilds;
   }
 
+  private static class InstanceHolder {
+    public static BuildCache INSTANCE = new BuildCache();
+  }
+
   /**
    * Allows returned downstreamBuild Sets to be sorted first by project name and then by number. The
    * default comparator for Run prioritizes build numbers before project name.
@@ -263,6 +310,19 @@ public class BuildCache {
         return r1.getNumber() - r2.getNumber();
       }
       return res;
+    }
+  }
+
+  public static class QueueTaskComparator implements Comparator<Queue.Item>, Serializable {
+
+    @Override
+    public int compare(Queue.Item i1, Queue.Item i2) {
+      if (i1.task instanceof AbstractItem && i2.task instanceof AbstractItem) {
+        return ((AbstractItem) i1.task)
+            .getFullName()
+            .compareTo(((AbstractItem) i2.task).getFullName());
+      }
+      return i1.task.getFullDisplayName().compareTo(i2.task.getFullDisplayName());
     }
   }
 }

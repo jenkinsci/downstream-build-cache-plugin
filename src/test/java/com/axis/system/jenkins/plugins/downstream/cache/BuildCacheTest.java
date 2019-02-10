@@ -46,6 +46,27 @@ public class BuildCacheTest {
   }
 
   /**
+   * Downstream task in Queue (WaitingItems)
+   *
+   * @throws Exception
+   */
+  @Test
+  public void downstreamTaskInQueue() throws Exception {
+    FreeStyleProject upstreamProject = j.createFreeStyleProject();
+    FreeStyleProject downstreamProject = j.createFreeStyleProject();
+    Run upstreamBuild = upstreamProject.scheduleBuild2(0).get();
+    downstreamProject.scheduleBuild2(10, new Cause.UpstreamCause(upstreamBuild));
+    assertThat(
+        "Wrong number of expected builds in queue",
+        BuildCache.getDownstreamQueueItems(upstreamBuild).size(),
+        is(1));
+    assertThat(
+        "Wrong expected build in cache",
+        BuildCache.getDownstreamQueueItems(upstreamBuild).iterator().next().task,
+        is(downstreamProject));
+  }
+
+  /**
    * Exercise cache building. Several downstream builds.
    *
    * @throws Exception
