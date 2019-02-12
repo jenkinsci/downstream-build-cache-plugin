@@ -35,7 +35,7 @@ import org.slf4j.LoggerFactory;
  * Cache responsible for keeping track of the upstream to downstream mapping. The initial scan takes
  * approximately 1 second per 50k builds.
  *
- * @author Gustaf Lundh <gustaf.lundh@axis.com>
+ * @author Gustaf Lundh (C) Axis 2018
  */
 public class BuildCache {
   private static final Logger LOGGER = LoggerFactory.getLogger(BuildCache.class.getName());
@@ -237,7 +237,11 @@ public class BuildCache {
     return downstreamBuilds;
   }
 
-  /** Builds a summary report of the cache */
+  /**
+   * Builds a summary report of the cache
+   *
+   * @return A summarized view of the content of the cache
+   */
   public String getStatistics() {
     StringBuilder sb =
         new StringBuilder()

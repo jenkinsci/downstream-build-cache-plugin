@@ -9,7 +9,7 @@ import hudson.model.listeners.RunListener;
  * Cache Downstream Graph from scheduled builds by intercepting UpstreamCauses of newly scheduled
  * builds.
  *
- * @author Gustaf Lundh <gustaf.lundh@axis.com>
+ * @author Gustaf Lundh (C) Axis 2018
  */
 @Extension
 public class RunListenerImpl extends RunListener<Run> {

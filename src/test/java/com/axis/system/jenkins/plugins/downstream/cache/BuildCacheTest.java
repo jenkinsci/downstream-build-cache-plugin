@@ -16,7 +16,7 @@ import org.jvnet.hudson.test.JenkinsRule;
 /**
  * Tests cache consistency and logic.
  *
- * @author Gustaf Lundh <gustaf.lundh@axis.com>
+ * @author Gustaf Lundh (C) Axis 2018
  */
 public class BuildCacheTest {
   @Rule public JenkinsRule j = new JenkinsRule();
