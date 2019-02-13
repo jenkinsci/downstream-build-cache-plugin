@@ -16,7 +16,7 @@ import org.jvnet.hudson.test.JenkinsRule;
 /**
  * Tests cache consistency and logic.
  *
- * @author Gustaf Lundh <gustaf.lundh@axis.com>
+ * @author Gustaf Lundh (C) Axis 2018
  */
 public class BuildCacheTest {
   @Rule public JenkinsRule j = new JenkinsRule();
@@ -43,6 +43,27 @@ public class BuildCacheTest {
         "Wrong expected build in cache",
         cache.getDownstreamBuilds(upstreamBuild),
         hasItem(downstreamBuild));
+  }
+
+  /**
+   * Downstream task in Queue (WaitingItems)
+   *
+   * @throws Exception
+   */
+  @Test
+  public void downstreamTaskInQueue() throws Exception {
+    FreeStyleProject upstreamProject = j.createFreeStyleProject();
+    FreeStyleProject downstreamProject = j.createFreeStyleProject();
+    Run upstreamBuild = upstreamProject.scheduleBuild2(0).get();
+    downstreamProject.scheduleBuild2(10, new Cause.UpstreamCause(upstreamBuild));
+    assertThat(
+        "Wrong number of expected builds in queue",
+        BuildCache.getDownstreamQueueItems(upstreamBuild).size(),
+        is(1));
+    assertThat(
+        "Wrong expected build in cache",
+        BuildCache.getDownstreamQueueItems(upstreamBuild).iterator().next().task,
+        is(downstreamProject));
   }
 
   /**

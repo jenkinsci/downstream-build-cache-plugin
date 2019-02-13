@@ -10,7 +10,7 @@ import hudson.model.listeners.ItemListener;
  * Remove all builds from a deleted project. Needed since it does not trigger RunListener.onDelete()
  * for the runs.
  *
- * @author Gustaf Lundh <gustaf.lundh@axis.com>
+ * @author Gustaf Lundh (C) Axis 2018
  */
 @Extension
 public class ItemListenerImpl extends ItemListener {
