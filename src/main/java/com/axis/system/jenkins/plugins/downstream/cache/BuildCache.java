@@ -172,7 +172,7 @@ public class BuildCache {
         }
         Set<String> downstreamBuilds =
             downstreamBuildCache.computeIfAbsent(
-                upstreamBuild.getExternalizableId(), v -> new HashSet<>());
+                upstreamBuild.getExternalizableId(), v -> ConcurrentHashMap.newKeySet());
         downstreamBuilds.add(downstreamRun.getExternalizableId());
       }
     }
