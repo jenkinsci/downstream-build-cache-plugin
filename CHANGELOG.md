@@ -1,6 +1,8 @@
 # Changelog
 
 ## Unreleased
+
+## v1.4
 * Fix: Concurrency bug
 
 ## v1.3
