@@ -62,6 +62,11 @@
       <name>Gustaf Lundh</name>
       <email>gustaf.lundh@axis.com</email>
     </developer>
+    <developer>
+      <id>jonsten</id>
+      <name>Jon Sten</name>
+      <email>jon.sten@axis.com</email>
+    </developer>
   </developers>
 
   <licenses>

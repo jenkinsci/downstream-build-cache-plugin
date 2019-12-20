@@ -70,11 +70,14 @@ public class BuildCache {
   }
 
   private static boolean isQueueItemCausedBy(Queue.Item item, Run run) {
+    if (run == null || item == null) {
+      return false;
+    }
     return item.getCauses().stream()
         .anyMatch(
             cause ->
                 cause instanceof UpstreamCause
-                    && ((UpstreamCause) cause).getUpstreamRun().equals(run));
+                    && run.equals(((UpstreamCause) cause).getUpstreamRun()));
   }
 
   /**
