@@ -74,7 +74,7 @@ public class BuildCache {
         .anyMatch(
             cause ->
                 cause instanceof UpstreamCause
-                    && ((UpstreamCause) cause).getUpstreamRun().equals(run));
+                    && run.equals(((UpstreamCause) cause).getUpstreamRun()));
   }
 
   /**
