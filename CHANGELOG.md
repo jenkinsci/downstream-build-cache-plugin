@@ -1,6 +1,7 @@
 # Changelog
 
 ## Unreleased
+* Fix: Extra NPE-guards [JENKINS-60504]
 
 ## v1.4
 * Fix: Concurrency bug
