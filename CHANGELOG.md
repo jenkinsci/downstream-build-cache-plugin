@@ -1,6 +1,8 @@
 # Changelog
 
 ## Unreleased
+
+## v1.4.1
 * Fix: Extra NPE-guards [JENKINS-60504]
 
 ## v1.4
