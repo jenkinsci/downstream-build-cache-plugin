@@ -33,7 +33,7 @@ public class BuildCacheTest {
     Run upstreamBuild = upstreamProject.scheduleBuild2(0).get();
     Run downstreamBuild =
         downstreamProject.scheduleBuild2(0, new Cause.UpstreamCause(upstreamBuild)).get();
-    BuildCache.getCache().reloadCache();
+    BuildCache.getCache().scheduleReloadCache().get();
     BuildCache cache = BuildCache.getCache();
     assertThat(
         "Wrong number of expected builds in cache",
@@ -81,7 +81,7 @@ public class BuildCacheTest {
         downstreamProjectA.scheduleBuild2(0, new Cause.UpstreamCause(upstreamBuild)).get();
     Run downstreamBuildB =
         downstreamProjectB.scheduleBuild2(0, new Cause.UpstreamCause(upstreamBuild)).get();
-    BuildCache.getCache().reloadCache();
+    BuildCache.getCache().scheduleReloadCache().get();
     BuildCache cache = BuildCache.getCache();
     assertThat(
         "Wrong number of expected builds in cache",
