@@ -11,7 +11,7 @@
   <description>Maintains a cache of the upstream / downstream build relationships and makes it
     available for other plugins.
   </description>
-  <url>https://wiki.jenkins.io/display/JENKINS/Downstream+Build+Cache+Plugin</url>
+  <url>https://github.com/jenkinsci/downstream-build-cache-plugin</url>
 
   <parent>
     <groupId>org.jenkins-ci.plugins</groupId>
