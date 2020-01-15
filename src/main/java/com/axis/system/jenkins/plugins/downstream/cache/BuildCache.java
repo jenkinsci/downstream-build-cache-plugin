@@ -2,6 +2,7 @@ package com.axis.system.jenkins.plugins.downstream.cache;
 
 import static hudson.init.InitMilestone.JOB_LOADED;
 
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import hudson.init.Initializer;
 import hudson.init.Terminator;
 import hudson.model.AbstractItem;
@@ -43,6 +44,8 @@ public class BuildCache {
 
   private final ConcurrentHashMap<String, Set<String>> downstreamBuildCache =
       new ConcurrentHashMap<>();
+
+  @SuppressFBWarnings("IS2_INCONSISTENT_SYNC")
   private ExecutorService workerThreadPool;
   private AtomicBoolean isCacheRefreshing = new AtomicBoolean(true);
   private Timer gcTimer;
@@ -224,14 +227,12 @@ public class BuildCache {
     Logger.info("GC completed!");
   }
 
-  public synchronized void setupGarbageCollector() {
+  public void setupGarbageCollector() {
     Logger.info("Setting up GC scheduling");
-    if (gcTimer == null) {
-      gcTimer = new Timer();
-    } else {
+    if (gcTimer != null) {
       gcTimer.cancel();
-      gcTimer = new Timer();
     }
+    gcTimer = new Timer();
     gcTimer.scheduleAtFixedRate(
         new TimerTask() {
           @Override
@@ -243,7 +244,7 @@ public class BuildCache {
         GC_INTERVAL);
   }
 
-  public synchronized void stopGarbageCollector() {
+  public void stopGarbageCollector() {
     Logger.info("Stopping GC scheduling");
     if (gcTimer != null) {
       gcTimer.cancel();
