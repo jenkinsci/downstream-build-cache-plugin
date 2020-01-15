@@ -27,7 +27,6 @@ import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 import jenkins.model.Jenkins;
-import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
@@ -39,7 +38,8 @@ import org.slf4j.LoggerFactory;
 public class BuildCache {
   private static final long GC_INTERVAL = TimeUnit.MINUTES.toMillis(10);
 
-  private static final Logger LOGGER = LoggerFactory.getLogger(BuildCache.class.getName());
+  private static final org.slf4j.Logger Logger =
+      LoggerFactory.getLogger(BuildCache.class.getName());
 
   private final ConcurrentHashMap<String, Set<String>> downstreamBuildCache =
       new ConcurrentHashMap<>();
@@ -118,7 +118,7 @@ public class BuildCache {
   }
 
   /**
-   * Indicated whether or not the cache is still building. If still building, the cache may not
+   * Indicates whether or not the cache is still building. If still building, the cache may not
    * return all of the downstream builds.
    *
    * @return true if cache is not complete.
@@ -161,7 +161,7 @@ public class BuildCache {
    * <p>E.g. @Initializer(after = JOB_LOADED)
    */
   private void reloadCache() {
-    LOGGER.info("Building downstream build cache...");
+    Logger.info("Building downstream build cache...");
     isCacheRefreshing.set(true);
     downstreamBuildCache.clear();
     // Allow Jenkins to return all jobs, regardless of security setup.
@@ -169,7 +169,7 @@ public class BuildCache {
       for (Job job : Jenkins.getInstance().getAllItems(Job.class)) {
         for (Run run : ((Job<?, ?>) job).getBuilds()) {
           if (workerThreadPool.isShutdown()) {
-            LOGGER.info("Worker Thread Pool is shutdown. Stopped reloading the cache!");
+            Logger.info("Worker Thread Pool is shutdown. Stopped reloading the cache!");
             return;
           }
           updateCache(run);
@@ -177,7 +177,7 @@ public class BuildCache {
       }
     }
     isCacheRefreshing.set(false);
-    LOGGER.info("Building downstream build cache completed!");
+    Logger.info("Building downstream build cache completed!");
   }
 
   /**
@@ -206,7 +206,7 @@ public class BuildCache {
   }
 
   public void doGarbageCollect() {
-    LOGGER.info("Running GC...");
+    Logger.info("Running GC...");
     try (ACLContext ignored = ACL.as(ACL.SYSTEM)) {
       downstreamBuildCache
           .entrySet()
@@ -215,17 +215,17 @@ public class BuildCache {
                 // Stop looking up builds if we are trying to shutdown.
                 if (!workerThreadPool.isShutdown()
                     && Run.fromExternalizableId(e.getKey()) == null) {
-                  LOGGER.info(e.getKey() + " will be GC:ed");
+                  Logger.info(e.getKey() + " will be GC:ed");
                   return true;
                 }
                 return false;
               });
     }
-    LOGGER.info("GC completed!");
+    Logger.info("GC completed!");
   }
 
   public synchronized void setupGarbageCollector() {
-    LOGGER.info("Setting up GC scheduling");
+    Logger.info("Setting up GC scheduling");
     if (gcTimer == null) {
       gcTimer = new Timer();
     } else {
@@ -244,14 +244,14 @@ public class BuildCache {
   }
 
   public synchronized void stopGarbageCollector() {
-    LOGGER.info("Stopping GC scheduling");
+    Logger.info("Stopping GC scheduling");
     if (gcTimer != null) {
       gcTimer.cancel();
     }
   }
 
   public synchronized void setupWorkerThread() {
-    LOGGER.info("Setting up worker thread pool");
+    Logger.info("Setting up worker thread pool");
     if (workerThreadPool == null || workerThreadPool.isShutdown()) {
       workerThreadPool =
           Executors.newSingleThreadExecutor(
@@ -270,18 +270,18 @@ public class BuildCache {
    * the cache.
    */
   public synchronized void stopWorkerThread() {
-    LOGGER.info("Stopping Worker Thread Pool...");
+    Logger.info("Stopping Worker Thread Pool...");
     workerThreadPool.shutdown();
     try {
       // Wait a while for existing tasks to terminate
       if (!workerThreadPool.awaitTermination(120, TimeUnit.SECONDS)) {
-        LOGGER.warn("Worker Thread Pool did not terminate gracefully!");
+        Logger.warn("Worker Thread Pool did not terminate gracefully!");
       }
     } catch (InterruptedException ie) {
       // Preserve interrupt status
       Thread.currentThread().interrupt();
     }
-    LOGGER.info("Worker Thread Pool stopped!");
+    Logger.info("Worker Thread Pool stopped!");
   }
 
   /**
