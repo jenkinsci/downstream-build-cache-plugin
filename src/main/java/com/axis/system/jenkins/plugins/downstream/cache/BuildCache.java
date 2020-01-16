@@ -2,6 +2,7 @@ package com.axis.system.jenkins.plugins.downstream.cache;
 
 import static hudson.init.InitMilestone.JOB_LOADED;
 
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import hudson.init.Initializer;
 import hudson.init.Terminator;
 import hudson.model.AbstractItem;
@@ -18,17 +19,20 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
-import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.TreeSet;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 import jenkins.model.Jenkins;
-import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
@@ -38,13 +42,19 @@ import org.slf4j.LoggerFactory;
  * @author Gustaf Lundh (C) Axis 2018
  */
 public class BuildCache {
-  private static final Logger LOGGER = LoggerFactory.getLogger(BuildCache.class.getName());
   private static final long GC_INTERVAL = TimeUnit.MINUTES.toMillis(10);
+
+  private static final org.slf4j.Logger Logger =
+      LoggerFactory.getLogger(BuildCache.class.getName());
 
   private final ConcurrentHashMap<String, Set<String>> downstreamBuildCache =
       new ConcurrentHashMap<>();
 
-  private Timer timer;
+  @SuppressFBWarnings("IS2_INCONSISTENT_SYNC")
+  private ExecutorService workerThreadPool;
+
+  private AtomicBoolean isCacheRefreshing = new AtomicBoolean(true);
+  private Timer gcTimer;
 
   /**
    * Returns the instance of this class.
@@ -58,15 +68,17 @@ public class BuildCache {
   /** Initialize the cache after all jobs are loaded. */
   @Initializer(after = JOB_LOADED)
   public static void initCache() {
-    LOGGER.info("Building downstream builds cache...");
-    getCache().reloadCache();
-    LOGGER.info("Building downstream builds cache completed!");
-    getCache().startGarbageCollector();
+    BuildCache cache = getCache();
+    cache.setupWorkerThread();
+    cache.scheduleReloadCache();
+    cache.setupGarbageCollector();
   }
 
   @Terminator()
   public static void stop() throws Exception {
-    getCache().stopGarbageCollector();
+    BuildCache cache = getCache();
+    cache.stopGarbageCollector();
+    cache.stopWorkerThread();
   }
 
   private static boolean isQueueItemCausedBy(Queue.Item item, Run run) {
@@ -115,6 +127,16 @@ public class BuildCache {
   }
 
   /**
+   * Indicates whether or not the cache is still building. If still building, the cache may not
+   * return all of the downstream builds.
+   *
+   * @return true if cache is not complete.
+   */
+  public boolean isCacheRefreshing() {
+    return isCacheRefreshing.get();
+  }
+
+  /**
    * Convenience method for parsing UpstreamCauses from a CauseAction.
    *
    * @param causeAction the downstream builds CauseAction
@@ -137,23 +159,34 @@ public class BuildCache {
     return upstreamBuilds;
   }
 
+  public Future scheduleReloadCache() {
+    return workerThreadPool.submit(this::reloadCache);
+  }
+
   /**
-   * Clears and reloads cache from disk. Should be executed on Jenkins startup after builds are
+   * Clears and reloads cache from disk. Should be scheduled on Jenkins startup after jobs are
    * loaded.
    *
    * <p>E.g. @Initializer(after = JOB_LOADED)
    */
-  public void reloadCache() {
+  private void reloadCache() {
+    Logger.info("Building downstream build cache...");
+    isCacheRefreshing.set(true);
     downstreamBuildCache.clear();
-
     // Allow Jenkins to return all jobs, regardless of security setup.
     try (ACLContext ignored = ACL.as(ACL.SYSTEM)) {
       for (Job job : Jenkins.getInstance().getAllItems(Job.class)) {
         for (Run run : ((Job<?, ?>) job).getBuilds()) {
+          if (workerThreadPool.isShutdown()) {
+            Logger.info("Worker Thread Pool is shutdown. Stopped reloading the cache!");
+            return;
+          }
           updateCache(run);
         }
       }
     }
+    isCacheRefreshing.set(false);
+    Logger.info("Building downstream build cache completed!");
   }
 
   /**
@@ -182,44 +215,83 @@ public class BuildCache {
   }
 
   public void doGarbageCollect() {
+    Logger.info("Running GC...");
     try (ACLContext ignored = ACL.as(ACL.SYSTEM)) {
-      downstreamBuildCache
-          .entrySet()
-          .removeIf(
-              e -> {
-                if (Run.fromExternalizableId(e.getKey()) == null) {
-                  LOGGER.info(e.getKey() + " will be GC:ed");
-                  return true;
-                }
-                return false;
-              });
+      for (Iterator<String> iter = downstreamBuildCache.keySet().iterator(); iter.hasNext(); ) {
+        String key = iter.next();
+        if (workerThreadPool.isShutdown()) {
+          Logger.info("Worker Thread Pool is shutdown. Stopped running GC.");
+          break;
+        }
+        if (Run.fromExternalizableId(key) == null) {
+          Logger.info("Removing orphan cache entry: " + key);
+          iter.remove();
+        }
+      }
     }
+    Logger.info("GC completed!");
   }
 
-  public synchronized void stopGarbageCollector() {
-    LOGGER.info("Stopping GC scheduling");
-    if (timer != null) {
-      timer.cancel();
+  public void setupGarbageCollector() {
+    Logger.info("Setting up GC scheduling");
+    if (gcTimer != null) {
+      gcTimer.cancel();
     }
-  }
-
-  public synchronized void startGarbageCollector() {
-    LOGGER.info("Setting up GC scheduling");
-    if (timer == null) {
-      timer = new Timer();
-    } else {
-      timer.cancel();
-      timer = new Timer();
-    }
-    timer.scheduleAtFixedRate(
+    gcTimer = new Timer();
+    gcTimer.scheduleAtFixedRate(
         new TimerTask() {
           @Override
           public void run() {
-            doGarbageCollect();
+            if (!isCacheRefreshing()) {
+              workerThreadPool.execute(BuildCache.this::doGarbageCollect);
+            } else {
+              Logger.info("Cache is still refreshing, did not submit GC-task to worker pool");
+            }
           }
         },
         GC_INTERVAL,
         GC_INTERVAL);
+  }
+
+  public void stopGarbageCollector() {
+    Logger.info("Stopping GC scheduling");
+    if (gcTimer != null) {
+      gcTimer.cancel();
+    }
+  }
+
+  public synchronized void setupWorkerThread() {
+    Logger.info("Setting up worker thread pool");
+    if (workerThreadPool == null || workerThreadPool.isShutdown()) {
+      workerThreadPool =
+          Executors.newSingleThreadExecutor(
+              runnable -> new Thread(runnable, "BuildCache Worker Thread"));
+    }
+  }
+
+  /**
+   * The using awaitTermination() is necessary, because if we allow Jenkins to continue shutting
+   * down while still refreshing the cache, the Jenkins.getInstance() will start returning null, all
+   * while we still try to examine builds. While most likely harmless, this will trigger loads of
+   * exceptions in the log.
+   *
+   * <p>We also avoid @see ExecutorService.shutdownNow(), since the InterruptedException will most
+   * likely be silenced by Jenkins in RunMap.retrieve(), where much time is spent when refreshing
+   * the cache.
+   */
+  public synchronized void stopWorkerThread() {
+    Logger.info("Stopping Worker Thread Pool...");
+    workerThreadPool.shutdown();
+    try {
+      // Wait a while for existing tasks to terminate
+      if (!workerThreadPool.awaitTermination(120, TimeUnit.SECONDS)) {
+        Logger.warn("Worker Thread Pool did not terminate gracefully!");
+      }
+    } catch (InterruptedException ie) {
+      // Preserve interrupt status
+      Thread.currentThread().interrupt();
+    }
+    Logger.info("Worker Thread Pool stopped!");
   }
 
   /**
@@ -248,9 +320,12 @@ public class BuildCache {
   public String getStatistics() {
     StringBuilder sb =
         new StringBuilder()
+            .append("Is Cache Refreshing: ")
+            .append(isCacheRefreshing.get())
+            .append('\n')
             .append("Number of upstream builds: ")
             .append(downstreamBuildCache.size())
-            .append("\n")
+            .append('\n')
             .append("Number of downstream builds: ")
             .append(downstreamBuildCache.values().stream().mapToInt(v -> v.size()).sum());
     return sb.toString();
