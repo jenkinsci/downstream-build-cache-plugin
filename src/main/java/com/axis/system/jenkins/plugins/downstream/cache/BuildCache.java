@@ -19,12 +19,17 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.TreeSet;
-import java.util.concurrent.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 import jenkins.model.Jenkins;
@@ -47,6 +52,7 @@ public class BuildCache {
 
   @SuppressFBWarnings("IS2_INCONSISTENT_SYNC")
   private ExecutorService workerThreadPool;
+
   private AtomicBoolean isCacheRefreshing = new AtomicBoolean(true);
   private Timer gcTimer;
 
@@ -211,18 +217,17 @@ public class BuildCache {
   public void doGarbageCollect() {
     Logger.info("Running GC...");
     try (ACLContext ignored = ACL.as(ACL.SYSTEM)) {
-      downstreamBuildCache
-          .entrySet()
-          .removeIf(
-              e -> {
-                // Stop looking up builds if we are trying to shutdown.
-                if (!workerThreadPool.isShutdown()
-                    && Run.fromExternalizableId(e.getKey()) == null) {
-                  Logger.info(e.getKey() + " will be GC:ed");
-                  return true;
-                }
-                return false;
-              });
+      for (Iterator<String> iter = downstreamBuildCache.keySet().iterator(); iter.hasNext(); ) {
+        String key = iter.next();
+        if (workerThreadPool.isShutdown()) {
+          Logger.info("Worker Thread Pool is shutdown. Stopped running GC.");
+          break;
+        }
+        if (Run.fromExternalizableId(key) == null) {
+          Logger.info("Removing orphan cache entry: " + key);
+          iter.remove();
+        }
+      }
     }
     Logger.info("GC completed!");
   }
@@ -237,7 +242,11 @@ public class BuildCache {
         new TimerTask() {
           @Override
           public void run() {
-            workerThreadPool.execute(BuildCache.this::doGarbageCollect);
+            if (!isCacheRefreshing()) {
+              workerThreadPool.execute(BuildCache.this::doGarbageCollect);
+            } else {
+              Logger.info("Cache is still refreshing, did not submit GC-task to worker pool");
+            }
           }
         },
         GC_INTERVAL,
