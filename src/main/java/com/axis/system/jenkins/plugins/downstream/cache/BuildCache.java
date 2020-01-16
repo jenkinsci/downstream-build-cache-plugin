@@ -26,6 +26,7 @@ import java.util.Timer;
 import java.util.TimerTask;
 import java.util.TreeSet;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -50,8 +51,8 @@ public class BuildCache {
   private final ConcurrentHashMap<String, Set<String>> downstreamBuildCache =
       new ConcurrentHashMap<>();
 
-  @SuppressFBWarnings("IS2_INCONSISTENT_SYNC")
   private ExecutorService workerThreadPool;
+  private Object workerThreadPoolLock = new Object();
 
   private AtomicBoolean isCacheRefreshing = new AtomicBoolean(true);
   private Timer gcTimer;
@@ -70,7 +71,7 @@ public class BuildCache {
   public static void initCache() {
     BuildCache cache = getCache();
     cache.setupWorkerThread();
-    cache.scheduleReloadCache();
+    cache.scheduleReloadCache(false);
     cache.setupGarbageCollector();
   }
 
@@ -159,8 +160,15 @@ public class BuildCache {
     return upstreamBuilds;
   }
 
-  public Future scheduleReloadCache() {
-    return workerThreadPool.submit(this::reloadCache);
+  public void scheduleReloadCache(boolean waitForCompletion) {
+    Future future = submitToWorkerThreadPool(this::reloadCache);
+    if (waitForCompletion) {
+      try {
+        future.get();
+      } catch (ExecutionException | InterruptedException e) {
+        Logger.warn("Could not complete task execution", e);
+      }
+    }
   }
 
   /**
@@ -232,6 +240,12 @@ public class BuildCache {
     Logger.info("GC completed!");
   }
 
+  private Future submitToWorkerThreadPool(Runnable runnable) {
+    synchronized (workerThreadPoolLock) {
+      return workerThreadPool.submit(runnable);
+    }
+  }
+
   public void setupGarbageCollector() {
     Logger.info("Setting up GC scheduling");
     if (gcTimer != null) {
@@ -243,7 +257,7 @@ public class BuildCache {
           @Override
           public void run() {
             if (!isCacheRefreshing()) {
-              workerThreadPool.execute(BuildCache.this::doGarbageCollect);
+              submitToWorkerThreadPool(BuildCache.this::doGarbageCollect);
             } else {
               Logger.info("Cache is still refreshing, did not submit GC-task to worker pool");
             }
@@ -260,12 +274,14 @@ public class BuildCache {
     }
   }
 
-  public synchronized void setupWorkerThread() {
+  public void setupWorkerThread() {
     Logger.info("Setting up worker thread pool");
-    if (workerThreadPool == null || workerThreadPool.isShutdown()) {
-      workerThreadPool =
-          Executors.newSingleThreadExecutor(
-              runnable -> new Thread(runnable, "BuildCache Worker Thread"));
+    synchronized (workerThreadPoolLock) {
+      if (workerThreadPool == null || workerThreadPool.isShutdown()) {
+        workerThreadPool =
+            Executors.newSingleThreadExecutor(
+                runnable -> new Thread(runnable, "BuildCache Worker Thread"));
+      }
     }
   }
 
@@ -279,17 +295,19 @@ public class BuildCache {
    * likely be silenced by Jenkins in RunMap.retrieve(), where much time is spent when refreshing
    * the cache.
    */
-  public synchronized void stopWorkerThread() {
+  public void stopWorkerThread() {
     Logger.info("Stopping Worker Thread Pool...");
-    workerThreadPool.shutdown();
-    try {
-      // Wait a while for existing tasks to terminate
-      if (!workerThreadPool.awaitTermination(120, TimeUnit.SECONDS)) {
-        Logger.warn("Worker Thread Pool did not terminate gracefully!");
+    synchronized (workerThreadPoolLock) {
+      workerThreadPool.shutdown();
+      try {
+        // Wait a while for existing tasks to terminate
+        if (!workerThreadPool.awaitTermination(120, TimeUnit.SECONDS)) {
+          Logger.warn("Worker Thread Pool did not terminate gracefully!");
+        }
+      } catch (InterruptedException ie) {
+        // Preserve interrupt status
+        Thread.currentThread().interrupt();
       }
-    } catch (InterruptedException ie) {
-      // Preserve interrupt status
-      Thread.currentThread().interrupt();
     }
     Logger.info("Worker Thread Pool stopped!");
   }
