@@ -1,5 +1,8 @@
 # Changelog
 
+## v1.5.1
+* Fix: Minor synchronization fixes
+
 ## v1.5
 * **Feature**: Build the cache in the background. Jenkins UI will no longer be blocked during the cache loading phase on Jenkins startup.
 
