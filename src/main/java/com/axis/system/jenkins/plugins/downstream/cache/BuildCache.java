@@ -89,7 +89,7 @@ public class BuildCache {
         .anyMatch(
             cause ->
                 cause instanceof UpstreamCause
-                    && run.equals(((UpstreamCause) cause).getUpstreamRun()));
+                    && ((UpstreamCause) cause).pointsTo(run));
   }
 
   /**
