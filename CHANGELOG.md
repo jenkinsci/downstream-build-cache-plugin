@@ -1,5 +1,8 @@
 # Changelog
 
+## v1.5.2
+* Fix: Queue related performance fixes
+
 ## v1.5.1
 * Fix: Minor synchronization fixes
 
