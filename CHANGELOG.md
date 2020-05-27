@@ -1,5 +1,8 @@
 # Changelog
 
+## v1.6
+* **Feature**: New pipeline step, downstreamBuilds, which provides downstream builds for a given build
+
 ## v1.5.2
 * Fix: Queue related performance fixes
 
