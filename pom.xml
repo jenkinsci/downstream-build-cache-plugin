@@ -4,7 +4,7 @@
 
   <groupId>com.axis.system.jenkins.plugins.downstream</groupId>
   <artifactId>downstream-build-cache</artifactId>
-  <version>1.6</version>
+  <version>1.7-SNAPSHOT</version>
   <packaging>hpi</packaging>
 
   <name>Downstream Build Cache Plugin</name>
@@ -45,7 +45,7 @@
     <developerConnection>scm:git:https://github.com/jenkinsci/downstream-build-cache-plugin
     </developerConnection>
     <url>https://github.com/jenkinsci/downstream-build-cache-plugin</url>
-    <tag>v1.6</tag>
+    <tag>HEAD</tag>
   </scm>
 
   <dependencies>
