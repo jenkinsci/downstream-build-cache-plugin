@@ -85,11 +85,9 @@ public class BuildCache {
     if (run == null || item == null) {
       return false;
     }
-    return item.getCauses().stream()
-        .anyMatch(
-            cause ->
-                cause instanceof UpstreamCause
-                    && ((UpstreamCause) cause).pointsTo(run));
+    return item.getCauses()
+        .stream()
+        .anyMatch(cause -> cause instanceof UpstreamCause && ((UpstreamCause) cause).pointsTo(run));
   }
 
   /**
