@@ -44,6 +44,7 @@ import org.slf4j.LoggerFactory;
  */
 public class BuildCache {
   private static final long GC_INTERVAL = TimeUnit.MINUTES.toMillis(10);
+  private static final String GC_ENABLE_KEY = BuildCache.class.getCanonicalName() + ".GC_ENABLED";
 
   private static final Logger logger = LoggerFactory.getLogger(BuildCache.class.getName());
 
@@ -51,9 +52,9 @@ public class BuildCache {
       new ConcurrentHashMap<>();
 
   private ExecutorService workerThreadPool;
-  private Object workerThreadPoolLock = new Object();
+  private final Object workerThreadPoolLock = new Object();
 
-  private AtomicBoolean isCacheRefreshing = new AtomicBoolean(true);
+  private final AtomicBoolean isCacheRefreshing = new AtomicBoolean(true);
   private Timer gcTimer;
 
   /**
@@ -71,7 +72,9 @@ public class BuildCache {
     BuildCache cache = getCache();
     cache.setupWorkerThread();
     cache.scheduleReloadCache(false);
-    cache.setupGarbageCollector();
+    if (Boolean.getBoolean(GC_ENABLE_KEY)) {
+      cache.setupGarbageCollector();
+    }
   }
 
   @Terminator()
@@ -85,8 +88,7 @@ public class BuildCache {
     if (run == null || item == null) {
       return false;
     }
-    return item.getCauses()
-        .stream()
+    return item.getCauses().stream()
         .anyMatch(cause -> cause instanceof UpstreamCause && ((UpstreamCause) cause).pointsTo(run));
   }
 
@@ -125,8 +127,8 @@ public class BuildCache {
   }
 
   /**
-   * Indicates whether or not the cache is still building. If still building, the cache may not
-   * return all of the downstream builds.
+   * Indicates whether the cache is still building. If still building, the cache may not
+   * return all the downstream builds.
    *
    * @return true if cache is not complete.
    */
@@ -147,7 +149,7 @@ public class BuildCache {
         Cause.UpstreamCause upstreamCause = (Cause.UpstreamCause) cause;
 
         Job upstreamJob =
-            Jenkins.getInstance().getItemByFullName(upstreamCause.getUpstreamProject(), Job.class);
+            Jenkins.get().getItemByFullName(upstreamCause.getUpstreamProject(), Job.class);
         if (upstreamJob == null) {
           continue;
         }
@@ -180,7 +182,7 @@ public class BuildCache {
     downstreamBuildCache.clear();
     // Allow Jenkins to return all jobs, regardless of security setup.
     try (ACLContext ignored = ACL.as(ACL.SYSTEM)) {
-      for (Job job : Jenkins.getInstance().getAllItems(Job.class)) {
+      for (Job job : Jenkins.get().getAllItems(Job.class)) {
         for (Run run : ((Job<?, ?>) job).getBuilds()) {
           if (workerThreadPool.isShutdown()) {
             logger.info("Worker Thread Pool is shutdown. Stopped reloading the cache!");
@@ -204,10 +206,8 @@ public class BuildCache {
       List<Run> upstreamBuilds = getUpstreamBuilds(causeAction);
 
       for (Run upstreamBuild : upstreamBuilds) {
-        /**
-         * We check for identical parents since Rebuilder-plugin defines the retriggered build as
-         * upstream cause, which can lead to some strange side effects in the visualization.
-         */
+        // We check for identical parents since Rebuilder-plugin defines the retriggered build as
+        // upstream cause, which can lead to some strange side effects in the visualization.
         if (upstreamBuild == null || upstreamBuild.getParent() == downstreamRun.getParent()) {
           continue;
         }
@@ -333,17 +333,14 @@ public class BuildCache {
    * @return A summarized view of the content of the cache
    */
   public String getStatistics() {
-    StringBuilder sb =
-        new StringBuilder()
-            .append("Is Cache Refreshing: ")
-            .append(isCacheRefreshing.get())
-            .append('\n')
-            .append("Number of upstream builds: ")
-            .append(downstreamBuildCache.size())
-            .append('\n')
-            .append("Number of downstream builds: ")
-            .append(downstreamBuildCache.values().stream().mapToInt(v -> v.size()).sum());
-    return sb.toString();
+    return "Is Cache Refreshing: " +
+            isCacheRefreshing.get() +
+            '\n' +
+            "Number of upstream builds: " +
+            downstreamBuildCache.size() +
+            '\n' +
+            "Number of downstream builds: " +
+            downstreamBuildCache.values().stream().mapToInt(Set::size).sum();
   }
 
   /**
