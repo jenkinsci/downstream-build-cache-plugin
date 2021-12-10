@@ -1,11 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
   <modelVersion>4.0.0</modelVersion>
 
   <groupId>com.axis.system.jenkins.plugins.downstream</groupId>
   <artifactId>downstream-build-cache</artifactId>
-  <version>1.7-SNAPSHOT</version>
+  <version>1.7</version>
   <packaging>hpi</packaging>
 
   <name>Downstream Build Cache Plugin</name>
@@ -18,7 +17,7 @@
     <groupId>org.jenkins-ci.plugins</groupId>
     <artifactId>plugin</artifactId>
     <version>3.47</version>
-    <relativePath/>
+    <relativePath />
   </parent>
 
   <build>
@@ -46,7 +45,7 @@
     <developerConnection>scm:git:https://github.com/jenkinsci/downstream-build-cache-plugin
     </developerConnection>
     <url>https://github.com/jenkinsci/downstream-build-cache-plugin</url>
-    <tag>HEAD</tag>
+    <tag>v1.7</tag>
   </scm>
 
   <dependencies>
