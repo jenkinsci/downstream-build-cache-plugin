@@ -1,5 +1,9 @@
 # Changelog
 
+## v1.7
+* **Major change**: GC:ing of the cache is now opt-in. To enable GC again, set the following system property to "true": com.axis.system.jenkins.plugins.downstream.cache.BuildCache.GC_ENABLED.
+  Check https://github.com/jenkinsci/downstream-build-cache-plugin/pull/10 for reasoning.
+
 ## v1.6
 * **Feature**: New pipeline step, downstreamBuilds, which provides downstream builds for a given build
 
