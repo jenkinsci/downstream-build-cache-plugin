@@ -146,6 +146,12 @@ public class BuildCache {
     List<Run> upstreamBuilds = new ArrayList<>();
     for (Cause cause : causeAction.getCauses()) {
       if (cause instanceof Cause.UpstreamCause) {
+        if (Jenkins.get().getPlugin("rebuild") != null) {
+          if (cause instanceof com.sonyericsson.rebuild.RebuildCause) {
+            // Ignore rebuild causes
+            continue;
+          }
+        }
         Cause.UpstreamCause upstreamCause = (Cause.UpstreamCause) cause;
 
         Job upstreamJob =
@@ -206,9 +212,7 @@ public class BuildCache {
       List<Run> upstreamBuilds = getUpstreamBuilds(causeAction);
 
       for (Run upstreamBuild : upstreamBuilds) {
-        // We check for identical parents since Rebuilder-plugin defines the retriggered build as
-        // upstream cause, which can lead to some strange side effects in the visualization.
-        if (upstreamBuild == null || upstreamBuild.getParent() == downstreamRun.getParent()) {
+        if (upstreamBuild == null) {
           continue;
         }
         Set<String> downstreamBuilds =
