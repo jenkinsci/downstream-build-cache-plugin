@@ -47,6 +47,9 @@ public class DownstreamBuildsStepTest {
     j.buildAndAssertSuccess(parent);
     SemaphoreStep.success("waitForParent/1", null);
     SemaphoreStep.success("waitForParent/2", null);
+
+    j.waitForCompletion(child1.getLastBuild());
+    j.waitForCompletion(child2.getLastBuild());
   }
 
   @Test

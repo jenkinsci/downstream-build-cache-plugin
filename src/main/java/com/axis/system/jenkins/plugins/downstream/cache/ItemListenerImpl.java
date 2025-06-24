@@ -17,8 +17,7 @@ public class ItemListenerImpl extends ItemListener {
   @Override
   public void onDeleted(Item item) {
     super.onDeleted(item);
-    if (item instanceof Job) {
-      Job<?, ?> job = (Job) item;
+    if (item instanceof Job<?, ?> job) {
       for (Run run : job.getBuilds()) {
         BuildCache.getCache().removeFromCache(run);
       }

@@ -1,13 +1,14 @@
 package com.axis.system.jenkins.plugins.downstream.cache.pipeline;
 
 import com.axis.system.jenkins.plugins.downstream.cache.BuildCache;
+import edu.umd.cs.findbugs.annotations.NonNull;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import hudson.Extension;
 import hudson.model.Run;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Set;
-import javax.annotation.Nonnull;
 import org.jenkinsci.plugins.workflow.steps.*;
 import org.jenkinsci.plugins.workflow.support.steps.build.RunWrapper;
 import org.kohsuke.stapler.DataBoundConstructor;
@@ -31,13 +32,13 @@ public class DownstreamBuildsStep extends Step {
   private static class Execution extends SynchronousNonBlockingStepExecution<List<RunWrapper>> {
     private final RunWrapper run;
 
-    protected Execution(@Nonnull RunWrapper run, @Nonnull StepContext context) {
+    protected Execution(@NonNull RunWrapper run, @NonNull StepContext context) {
       super(context);
       this.run = run;
     }
 
     @Override
-    @edu.umd.cs.findbugs.annotations.SuppressFBWarnings(
+    @SuppressFBWarnings(
         value = "NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE",
         justification = "rawBuild can't be null singe getDownstreamBuilds filter out null elements")
     protected List<RunWrapper> run() throws Exception {
@@ -64,6 +65,7 @@ public class DownstreamBuildsStep extends Step {
     }
 
     @Override
+    @NonNull
     public String getDisplayName() {
       return "Provide list of downstream builds";
     }

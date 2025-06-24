@@ -89,7 +89,7 @@ public class BuildCache {
       return false;
     }
     return item.getCauses().stream()
-        .anyMatch(cause -> cause instanceof UpstreamCause && ((UpstreamCause) cause).pointsTo(run));
+        .anyMatch(cause -> cause instanceof UpstreamCause upstreamCause && upstreamCause.pointsTo(run));
   }
 
   /**
@@ -145,10 +145,9 @@ public class BuildCache {
   private List<Run> getUpstreamBuilds(CauseAction causeAction) {
     List<Run> upstreamBuilds = new ArrayList<>();
     for (Cause cause : causeAction.getCauses()) {
-      if (cause instanceof Cause.UpstreamCause) {
-        Cause.UpstreamCause upstreamCause = (Cause.UpstreamCause) cause;
+      if (cause instanceof UpstreamCause upstreamCause) {
 
-        Job upstreamJob =
+          Job upstreamJob =
             Jenkins.get().getItemByFullName(upstreamCause.getUpstreamProject(), Job.class);
         if (upstreamJob == null) {
           continue;
@@ -181,7 +180,7 @@ public class BuildCache {
     isCacheRefreshing.set(true);
     downstreamBuildCache.clear();
     // Allow Jenkins to return all jobs, regardless of security setup.
-    try (ACLContext ignored = ACL.as(ACL.SYSTEM)) {
+    try (ACLContext ignored = ACL.as2(ACL.SYSTEM2)) {
       for (Job job : Jenkins.get().getAllItems(Job.class)) {
         for (Run run : ((Job<?, ?>) job).getBuilds()) {
           if (workerThreadPool.isShutdown()) {
@@ -221,7 +220,7 @@ public class BuildCache {
 
   public void doGarbageCollect() {
     logger.info("Running GC...");
-    try (ACLContext ignored = ACL.as(ACL.SYSTEM)) {
+    try (ACLContext ignored = ACL.as2(ACL.SYSTEM2)) {
       for (Iterator<String> iter = downstreamBuildCache.keySet().iterator(); iter.hasNext(); ) {
         String key = iter.next();
         if (workerThreadPool.isShutdown()) {
@@ -229,7 +228,7 @@ public class BuildCache {
           break;
         }
         if (Run.fromExternalizableId(key) == null) {
-          logger.info("Removing orphan cache entry: " + key);
+          logger.info("Removing orphan cache entry: {}", key);
           iter.remove();
         }
       }
@@ -411,10 +410,8 @@ public class BuildCache {
 
     @Override
     public int compare(Queue.Item i1, Queue.Item i2) {
-      if (i1.task instanceof AbstractItem && i2.task instanceof AbstractItem) {
-        return ((AbstractItem) i1.task)
-            .getFullName()
-            .compareTo(((AbstractItem) i2.task).getFullName());
+      if (i1.task instanceof AbstractItem item1 && i2.task instanceof AbstractItem item2) {
+        return item1.getFullName().compareTo(item2.getFullName());
       }
       return i1.task.getFullDisplayName().compareTo(i2.task.getFullDisplayName());
     }
