@@ -1,5 +1,8 @@
 # Changelog
 
+## Unreleased
+* **Feature**: New REST API endpoint, `/downstream-build-tree`, which returns the full downstream build tree (as JSON or XML) for a given project and build number.
+
 ## v1.7
 * **Major change**: GC:ing of the cache is now opt-in. To enable GC again, set the following system property to "true": com.axis.system.jenkins.plugins.downstream.cache.BuildCache.GC_ENABLED.
   Check https://github.com/jenkinsci/downstream-build-cache-plugin/pull/10 for reasoning.
